@@ -1,0 +1,60 @@
+---
+- hosts: tag_Name_Mediawiki_mysql
+  tasks:
+   - name: Image Pull
+     shell: docker pull mysql:5.7
+     register: image_pull
+
+   - debug:
+     var: image_pull.stdout_lines
+         
+   - name: Container_stop
+     shell: docker rm -f mediawiki_mysql
+     ignore_errors: True         
+         
+   - name: Container start
+     shell: docker run --name=mediawiki_mysql --network mediawiki_mysql -e MYSQL_DATABASE=wikidb -e MYSQL_USER=wikiuser -e MYSQL_PASSWORD=mysecret -e MYSQL_RANDOM_ROOT_PASSWORD=1 -v /var/mediawiki/mysql:/var/lib/mysql -p 3306:3306 -d mysql:5.7; sleep 60
+         
+- hosts: tag_Name_Mediawiki_mysql
+  become_user: root
+  tasks:     
+   - name: Get_Dynamic_mysql_private-ip
+     shell: ip -o -f inet addr show | awk '/scope global docker0/ {print $4}'
+     register: mysql_private_ip  
+     
+   - debug: var=mysql_private_ip.stdout
+   
+   - name: Add a host with a non-standard port local to your machines
+     add_host:
+       name: "Mediawiki_mysql"
+       private_ip_mysql: "{{ mysql_private_ip.stdout }}"   
+           
+- hosts: tag_Name_Mediawiki_app
+  tasks:   
+   - name: Image Pull
+     shell: docker pull mediawiki
+     register: image_pull
+
+   - debug:
+     var: image_pull.stdout_lines
+     
+   - name: Container_stop
+     shell: docker rm -f mediawiki
+     ignore_errors: True  
+  
+   - name: Docker network creation to connect mysql with application  
+     shell: docker network create -d bridge --subnet {{ hostvars['Mediawiki_mysql']['private_ip_mysql'] }} mediawiki_mysql
+         
+   - name: Container start      
+     shell: docker run -d --name=mediawiki --network mediawiki_mysql -e MEDIAWIKI_SERVER=http://localhost:8080 -e MEDIAWIKI_SITENAME=MyWiki -e MEDIAWIKI_LANGUAGE_CODE=en -e MEDIAWIKI_DB_TYPE=mysql -e MEDIAWIKI_DB_HOST=mediawiki_mysql -e MEDIAWIKI_DB_PORT=3306 -e MEDIAWIKI_DB_NAME=wikidb -e MEDIAWIKI_DB_USER=wikiuser -e MEDIAWIKI_DB_PASSWORD=mysecret -e MEDIAWIKI_ENABLE_UPLOADS=1 -v /var/mediawiki/images:/images -p 8080:80 mediawiki
+         
+     register: container_start
+
+   - debug:
+     var: container_start.stdout_lines
+     
+   - name: Health_Check_App
+     shell: curl -I http://localhost:8080
+     register: health_check_app
+     
+   - debug: var=health_check_app.stdout_lines   
