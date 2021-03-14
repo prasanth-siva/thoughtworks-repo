@@ -1,4 +1,4 @@
-aws_region     = "us-east-1"
+aws_region     = "us-east-2"
 vpc_cidr_block = "172.69.0.0/16"
 private_subnets     = ["172.69.5.0/24", "172.69.6.0/24", "172.69.8.0/24", "172.69.4.0/24"]
 private_subnet_name = ["mediawiki-app-az1", "mediawiki-app-az2", "mediawiki-mysql", "mediawiki-operation"]
@@ -16,7 +16,7 @@ staging_setup = {
 }
 
 ami_names = {
-  mediawiki = "CentOS Linux 7 x86_64 HVM EBS ENA 2002_01-b7ee8a69-ee97-4a49-9e68-afaee216db2e-ami-0042af67f8e4dcc20.4"
+  mediawiki = "CentOS-Linux-7-HVM"
 }
 
 usecase              = "mediawiki-prod"

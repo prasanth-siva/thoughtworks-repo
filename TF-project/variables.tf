@@ -29,8 +29,7 @@ variable "prod_setup" { type = map }
 
 variable "environment" {}
 variable "product" {}
-variable "monitoring" {}
 #variable "squid_instance_type" {}
 variable "zone_name" {}
-variable "ec2_read_iam_role" {}
+#variable "ec2_read_iam_role" {}
 variable "ami_names" {type = map }

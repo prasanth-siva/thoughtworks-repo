@@ -63,7 +63,7 @@ resource "aws_security_group_rule" "common_ssh" {
   from_port                = 22
   to_port                  = 22
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.LFR_jump_sg.id
+  source_security_group_id = aws_security_group.mediaw-jup-sg.id
   security_group_id        = aws_security_group.media-common-sg.id
   description              = "allow_ssh_from_jump"
 }
@@ -73,9 +73,45 @@ resource "aws_security_group_rule" "common_to_jump" {
   from_port                = 22
   to_port                  = 22
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.LFR_jump_sg.id
+  security_group_id        = aws_security_group.mediaw-jup-sg.id
   source_security_group_id = aws_security_group.media-common-sg.id
   description              = "allow_ssh_from_jump"
+}
+
+resource "aws_security_group_rule" "igw-alb" {
+  type        = "ingress"
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  cidr_blocks = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.media-wiki-alb.id
+}
+
+resource "aws_security_group_rule" "alb-app" {
+  type        = "egress"
+  from_port   = 0
+  to_port     = 0
+  protocol    = "-1"
+  source_security_group_id = aws_security_group.media-wiki-app.id
+  security_group_id = aws_security_group.media-wiki-alb.id
+}
+
+resource "aws_security_group_rule" "app-mysql-out" {
+  type              = "egress"
+  from_port         = 3306
+  to_port           = 3306
+  protocol          = "tcp"
+  source_security_group_id = aws_security_group.media-wiki-mysql.id
+  security_group_id = aws_security_group.media-wiki-app.id
+}
+
+resource "aws_security_group_rule" "app-mysql-in" {
+  type              = "ingress"
+  from_port         = 3306
+  to_port           = 3306
+  protocol          = "tcp"
+  source_security_group_id = aws_security_group.media-wiki-app.id
+  security_group_id = aws_security_group.media-wiki-mysql.id
 }
 
 resource "aws_security_group_rule" "outb_app_http" {
@@ -113,4 +149,3 @@ resource "aws_security_group_rule" "outb_https" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.media-wiki-mysql.id
 }
-

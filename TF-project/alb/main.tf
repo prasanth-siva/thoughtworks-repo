@@ -1,5 +1,5 @@
 resource "aws_lb" "Alb" {
-  name                       = "liferay-alb"
+  name                       = "Mediawiki-prod-alb"
   internal                   = false
   load_balancer_type         = "application"
   security_groups            = var.security_groups 

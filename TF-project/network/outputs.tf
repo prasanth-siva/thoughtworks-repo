@@ -63,33 +63,6 @@ output "private_route_table_ids" {
   value       = aws_route_table.private.*.id
 }
 
-
-# VPC Endpoints
-output "vpc_endpoint_s3_id" {
-  description = "The ID of VPC endpoint for S3"
-  value       = concat(aws_vpc_endpoint.s3.*.id, [""])[0]
-}
-
-output "vpc_endpoint_s3_pl_id" {
-  description = "The prefix list for the S3 VPC endpoint."
-  value       = concat(aws_vpc_endpoint.s3.*.prefix_list_id, [""])[0]
-}
-
-output "vpc_endpoint_ecr_api_id" {
-  description = "The ID of VPC endpoint for ECR API"
-  value       = concat(aws_vpc_endpoint.ecr_api.*.id, [""])[0]
-}
-
-output "vpc_endpoint_ecr_api_network_interface_ids" {
-  description = "One or more network interfaces for the VPC Endpoint for ECR API."
-  value       = flatten(aws_vpc_endpoint.ecr_api.*.network_interface_ids)
-}
-
-output "vpc_endpoint_ecr_api_dns_entry" {
-  description = "The DNS entries for the VPC Endpoint for ECR API."
-  value       = flatten(aws_vpc_endpoint.ecr_api.*.dns_entry)
-}
-
 output "r53_zone_id" {
   value =  aws_route53_zone.main.0.id
 }

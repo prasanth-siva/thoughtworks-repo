@@ -46,7 +46,7 @@ resource "aws_vpc_ipv4_cidr_block_association" "this" {
   cidr_block = element(var.secondary_cidr_blocks, count.index)
 }
 
-resource "aws_internet_gateway" "liferay_igw" {
+resource "aws_internet_gateway" "mediawiki_igw" {
 
   vpc_id = local.vpc_id
 
@@ -63,7 +63,7 @@ resource "aws_route_table" "public" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.liferay_igw.id
+    gateway_id = aws_internet_gateway.mediawiki_igw.id
   }
 
   tags = merge(
@@ -172,142 +172,83 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public[0].id
 }
 
-######################
-# VPC Endpoint for S3
-######################
-
-data "aws_vpc_endpoint_service" "s3" {
-  count = var.create_vpc && var.enable_s3_endpoint ? 1 : 0
-  #count   = 1  
-  service = "s3"
-  service_type = "Gateway"
-
-}
-
-resource "aws_vpc_endpoint" "s3" {
-  count = var.create_vpc && var.enable_s3_endpoint ? 1 : 0
-
-  vpc_id       = local.vpc_id
-  #service_name = data.aws_vpc_endpoint_service.s3[0].service_name
-  service_name = "com.amazonaws.us-east-1.s3"
-  policy = <<POLICY
-{
-    "Version": "2008-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": "s3:*",
-            "Resource": [
-                "arn:aws:s3:::liferay-2020-gc",
-                "arn:aws:s3:::liferay-2020-gc/*",
-                "arn:aws:s3:::prod-us-east-1-starport-layer-bucket/*"
-            ]
-        }
-    ]
-}
-POLICY
-
- tags = merge(
-    {
-      "Name" = "Liferay_S3"
-    },
-    var.tags,
-    var.vpc_tags,
-  )
-}
-
-
-resource "aws_vpc_endpoint_route_table_association" "private_s3" {
-  count = var.create_vpc && var.enable_s3_endpoint ? local.nat_gateway_count : 0
-  vpc_endpoint_id = aws_vpc_endpoint.s3[0].id
-  route_table_id  = element(aws_route_table.private.*.id, count.index)
-}
-
-/*resource "aws_vpc_endpoint_route_table_association" "public_s3" {
-  count = var.create_vpc && var.enable_s3_endpoint && length(var.public_subnets) > 0 ? 1 : 0
-
-  vpc_endpoint_id = aws_vpc_endpoint.s3[0].id
-  route_table_id  = aws_route_table.public[0].id
-}*/
-
-
-###########################
-# VPC Endpoint for ECR API
-###########################
-data "aws_vpc_endpoint_service" "ecr_api" {
-  count = var.create_vpc && var.enable_ecr_api_endpoint ? 1 : 0
-
-  service = "ecr.api"
-}
-
-resource "aws_vpc_endpoint" "ecr_api" {
-  count = var.create_vpc && var.enable_ecr_api_endpoint ? 1 : 0
-
-  vpc_id            = local.vpc_id
-  service_name      = data.aws_vpc_endpoint_service.ecr_api[0].service_name
-  vpc_endpoint_type = "Interface"
-
-  security_group_ids  = var.ecr_api_endpoint_security_group_ids
-  subnet_ids          = [aws_subnet.public[1].id]
-  /*subnet_ids          = coalescelist(var.ecr_api_endpoint_subnet_ids, aws_subnet.private.*.id )*/
-  private_dns_enabled = var.ecr_api_endpoint_private_dns_enabled
-
-  tags = merge(
-    {
-      "Name" = "Liferay_ECR_API"
-    },
-    var.tags,
-    var.vpc_tags,
-  )
-}
-
-###########################
-# VPC Endpoint for ECR DKR
-###########################
-data "aws_vpc_endpoint_service" "ecr_dkr" {
-  count = var.create_vpc && var.enable_ecr_dkr_endpoint ? 1 : 0
-
-  service = "ecr.dkr"
-}
-
-resource "aws_vpc_endpoint" "ecr_dkr" {
-  count = var.create_vpc && var.enable_ecr_dkr_endpoint ? 1 : 0
-
-  vpc_id            = local.vpc_id
-  service_name      = data.aws_vpc_endpoint_service.ecr_dkr[0].service_name
-  vpc_endpoint_type = "Interface"
-
-  security_group_ids  = var.ecr_dkr_endpoint_security_group_ids
-  subnet_ids          = [aws_subnet.public[1].id]
-  /*subnet_ids          = coalescelist(var.ecr_dkr_endpoint_subnet_ids, aws_subnet.private.*.id )*/
-  private_dns_enabled = var.ecr_dkr_endpoint_private_dns_enabled
-
-  tags = merge(
-    {
-      "Name" = "Liferay_ECR_DKR"
-    },
-    var.tags,
-    var.vpc_tags,
-  )
-}
-
 #################
 #aws route
 #################
-resource "aws_route" "private_squid_gateway" {
-  count                  = var.enable_squid_gateway ? local.max_subnet_length : 0
-  route_table_id         = element(aws_route_table.private.*.id, count.index)
+resource "aws_route" "public_internet_gateway" {
+  count = var.create_vpc && var.create_igw && length(var.public_subnets) > 0 ? 1 : 0
+
+  route_table_id         = aws_route_table.public[0].id
   destination_cidr_block = "0.0.0.0/0"
-  network_interface_id   = element(var.interface_id, count.index)
+  gateway_id             = aws_internet_gateway.mediawiki_igw.id
 
   timeouts {
     create = "5m"
   }
+}
 
-   lifecycle {
-    ignore_changes = [
-      network_interface_id,
-    ]
+##############
+# NAT Gateway
+##############
+locals {
+  nat_gateway_ips = split(
+    ",",
+    var.reuse_nat_ips ? join(",", var.external_nat_ip_ids) : join(",", aws_eip.nat.*.id),
+  )
+}
+
+resource "aws_eip" "nat" {
+  count = var.create_vpc && var.enable_nat_gateway && false == var.reuse_nat_ips ? local.nat_gateway_count : 0
+
+  vpc = true
+
+  tags = merge(
+    {
+      "Name" = format(
+        "%s-%s",
+        var.name,
+        element(var.azs, var.single_nat_gateway ? 0 : count.index),
+      )
+    },
+    var.tags,
+  )
+}
+
+resource "aws_nat_gateway" "this" {
+  count = var.create_vpc && var.enable_nat_gateway ? local.nat_gateway_count : 0
+
+  allocation_id = element(
+    local.nat_gateway_ips,
+    var.single_nat_gateway ? 0 : count.index,
+  )
+  subnet_id = element(
+    aws_subnet.public.*.id,
+    var.single_nat_gateway ? 0 : count.index,
+  )
+
+  tags = merge(
+    {
+      "Name" = format(
+        "%s-%s",
+        var.name,
+        element(var.azs, var.single_nat_gateway ? 0 : count.index),
+      )
+    },
+    var.tags,
+  )
+
+  depends_on = [aws_internet_gateway.mediawiki_igw]
+}
+
+resource "aws_route" "private_nat_gateway" {
+  count = var.create_vpc && var.enable_nat_gateway ? local.nat_gateway_count : 0
+
+  route_table_id         = element(aws_route_table.private.*.id, count.index)
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = element(aws_nat_gateway.this.*.id, count.index)
+
+  timeouts {
+    create = "5m"
   }
 }
+
