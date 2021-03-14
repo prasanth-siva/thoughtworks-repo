@@ -20,7 +20,7 @@ sudo apt-get -y install ansible
 
 _export the AWS SECRET KEY & ACCESS KEY & REGION_
 
-# Init
+# Initialize 
 terrform init
 
 # Plan
