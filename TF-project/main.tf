@@ -78,7 +78,7 @@ data "template_file" "app_user_init" {
 
 module "mediawiki-app" {
   source         = "./instance"
-  name           = "mediawiki-app"
+  name           = "Mediawiki_app"
   instance_count = 2
   #ami = "ami-0ce21b51cb31a48b8"
   ami = data.aws_ami.mediawiki-app.id
@@ -100,7 +100,7 @@ module "mediawiki-app" {
     environment = var.environment
     product     = var.product
     service     = "mediawiki"
-    Name        = "Mediawiki-app"
+    Name        = "Mediawiki_app"
   }
 }
 
@@ -114,7 +114,7 @@ data "template_file" "mysql_user_init" {
 
 module "mysql" {
   source         = "./instance"
-  name           = "Mediawiki-mysql"
+  name           = "Mediawiki_mysql"
   instance_count = 1
   ami = data.aws_ami.mediawiki-mysql.id
   instance_type          = var.instance_type == "prod_setup" ? var.prod_setup["mysql"] : var.staging_setup["mysql"]
@@ -133,7 +133,7 @@ module "mysql" {
     environment = var.environment
     product     = var.product
     service     = "mysql"
-    Name        = "Mediawiki-mysql"
+    Name        = "Mediawiki_mysql"
   }
 
 }
