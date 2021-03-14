@@ -26,10 +26,10 @@ sudo apt-get -y install ansible
 _export the AWS SECRET KEY & ACCESS KEY & REGION_
 
 # Initialize 
-> terrform init
+> terraform init
 
 # Plan
-> terrform plan -var="instance_type=prod_setup" -var-file=prod.tfvars -input=false
+> terraform plan -var="instance_type=prod_setup" -var-file=prod.tfvars -input=false
 
 # Apply
 > terraform apply -var="instance_type=prod_setup" -var-file=prod.tfvars -input=false -auto-approve
