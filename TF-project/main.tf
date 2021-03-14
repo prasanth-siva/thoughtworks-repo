@@ -3,25 +3,6 @@ provider "aws" {
 
 }
 
-resource "aws_s3_bucket" "tf_state_file" {
-  bucket = "tf_state_file"
-  acl    = "private"
-
-  tags = {
-    Name        = "tf_state_file"
-    Environment = "Prod"
-  }
-}
-
-terraform {
-  backend "s3" {
-    bucket = "tf_state_file"
-    #"key    = "preprod/ecs-payment/preprod1.tf"
-    region = "us-east-1"
-    #role_arn = var.assume_role
-  }
-}
-
 data "aws_ami" "mediawiki-app" {
   most_recent = true
   owners      = ["679593333241"]
