@@ -33,3 +33,7 @@ variable "product" {}
 variable "zone_name" {}
 #variable "ec2_read_iam_role" {}
 variable "ami_names" {type = map }
+variable "app_min_count" {}
+variable "app_max_count" {}
+variable "app_desired_count" {}
+variable "protect_scalein" { type = bool }

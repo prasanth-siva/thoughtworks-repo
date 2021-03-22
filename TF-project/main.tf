@@ -75,35 +75,6 @@ data "template_file" "app_user_init" {
 #   allocation_id = var.eip_allocation_id[2]
 # }
 
-
-module "mediawiki-app" {
-  source         = "./instance"
-  name           = "Mediawiki_app"
-  instance_count = 2
-  #ami = "ami-0ce21b51cb31a48b8"
-  ami = data.aws_ami.mediawiki-app.id
-  instance_type          = var.instance_type == "prod_setup" ? var.prod_setup["app"] : var.staging_setup["app"]
-  key_name               = var.key_pair 
-  monitoring             = false
-  associate_public_ip_address = false
-  subnet_ids             = [module.vpc.private_subnets[0],module.vpc.private_subnets[1]]
-  vpc_security_group_ids = [aws_security_group.media-wiki-app.id]
-  user_data              = data.template_file.app_user_init.0.rendered
-  #iam_instance_profile   = var.ec2_read_iam_role
-
-  volume_tags = {
-    usecase = var.usecase
-  }
-
-  tags = {
-    usecase     = var.usecase
-    environment = var.environment
-    product     = var.product
-    service     = "mediawiki"
-    Name        = "Mediawiki_app"
-  }
-}
-
 data "template_file" "mysql_user_init" {
   count    = 1
   template = "${file("${path.module}/ruserdata.tpl")}"
@@ -165,19 +136,6 @@ resource "aws_lb_listener" "frontend_http_tcp" {
   }
 }
 
-
-resource "aws_lb_target_group_attachment" "mediawiki-app-tg" {
-  target_group_arn = module.alb.target_group_arns
-  target_id        = module.mediawiki-app.id[0]
-  port             = 8080
-}
-
-resource "aws_lb_target_group_attachment" "mediawiki-app2-tg" {
-  target_group_arn = module.alb.target_group_arns
-  target_id        = module.mediawiki-app.id[1]
-  port             = 8080
-}
-
 resource "aws_lb_listener_rule" "mediawiki_tcp_rule" {
   listener_arn = aws_lb_listener.frontend_http_tcp.arn
   priority     = 100
@@ -194,73 +152,71 @@ resource "aws_lb_listener_rule" "mediawiki_tcp_rule" {
   }
 }
 
-# module "mediawiki_launch_template" {
-#  # source = "git::ssh://git@bitbucket.org/gc-engineering/aws-resource.git//modules/tf-launch-template?ref=ecs_autoscaling"
-#   source = "./launch_template"
-#   name = "${var.product}_${var.environment}_mediawiki"
-#   image_id = data.aws_ami.liferay-es.id
-#   instance_type = var.instance_type == "prod_setup" ? var.prod_setup["es"] : var.staging_setup["es"]
-#   key_name = var.key_pair
-#   security_group_ids = [aws_security_group.LFR_ES_sg.id,aws_security_group.LFR_common_sg.id]
-#   userdata = "${base64encode("${data.template_file.mw_userdata_file.rendered}")}"
-#   tags =  {
-#     Name  = "${var.product}_${var.environment}_mw"
-#     usecase = var.usecase
-#     product = var.product
-#     environment = var.environment
-#     compliance = var.compliance
-#     service = var.service_tags["mw"]
-#     tier = var.tier_tags["application"]
-#   }    
-# }
+#####################################
+#Mediawiki App ASG and Launch template
+#####################################
+data "template_file" "mw_userdata_file" {
+  template = "${file("${path.module}/userdata_app_dns.tpl")}"
+  vars = {
+    cluster_name = "${var.product}_${var.environment}_mediawikiapp"
+    zone_id = module.vpc.r53_zone_id
+    hostname = "mwapp.${var.zone_name}"
+  }
+}
 
+module "mediawikiapp_launch_template" {
+  source = "./launch_template"
+  name = "${var.product}_${var.environment}_mediawikiapp"
+  image_id = data.aws_ami.mediawiki-mysql.id
+  instance_type = var.instance_type == "prod_setup" ? var.prod_setup["app"] : var.staging_setup["app"]
+  key_name = var.key_pair
+  security_group_ids = [aws_security_group.media-common-sg.id,aws_security_group.media-wiki-app.id]
+  userdata = "${base64encode("${data.template_file.mw_userdata_file.rendered}")}"
+  tags =  {
+    Name  = "${var.product}_${var.environment}_mediawikiapp"
+    usecase = var.usecase
+    product = var.product
+    environment = var.environment
+    compliance = var.compliance
+    tier = "application"
+  }    
+}
 
-# module "mediawiki_autoscaling_group" {
-#   #source = "./autoscaling/auto_scaling_group"
-#   source = "./asg"
-#   name = "${var.product}_${var.environment}_mediawiki"
-#   min_size = var.mw_min_count
-#   max_size = var.mw_max_count
-#   desired_capacity = var.mw_desired_count
-#   protect_scalein = var.protect_scalein
-#   az1 = module.vpc.private_subnets[1]
-#   az2 = module.vpc.private_subnets[2]
-#   launch_template_id = module.mw_launch_template.launch_template_id
-#   tags = [
-#     {
-#       key                 = "environment"
-#       value               = var.environment
-#       propagate_at_launch = true
-#     },
-#     {
-#       key                 = "product"
-#       value               = var.product
-#       propagate_at_launch = true
-#     },
-#     {
-#       key                 = "usecase"
-#       value               = var.usecase
-#       propagate_at_launch = true
-#     },
-#     {
-#       key                 = "monitoring"
-#       value               = var.monitoring
-#       propagate_at_launch = true
-#     },    
-#     {
-#       key                 = "compliance"
-#       value               = var.compliance
-#       propagate_at_launch = true
-#     },
-#     {
-#       key                 = "ddkey"
-#       value               = var.ddkey
-#       propagate_at_launch = true
-#     },
-#     {
-#       key                 = "tier"
-#       value               = "application"
-#       propagate_at_launch = true
-#     },
-#   ]
-# }
+module "mediawikiapp_autoscaling_group" {
+  source = "./asg"
+  name = "${var.product}_${var.environment}_mediawikiapp"
+  min_size = var.app_min_count
+  max_size = var.app_max_count 
+  desired_capacity = var.app_desired_count
+  protect_scalein = var.protect_scalein
+  az1 = module.vpc.private_subnets[0] 
+  az2 = module.vpc.private_subnets[1]
+  launch_template_id = module.mediawikiapp_launch_template.launch_template_id
+  tags = [
+    {
+      key                 = "environment"
+      value               = var.environment
+      propagate_at_launch = true
+    },
+    {
+      key                 = "product"
+      value               = var.product
+      propagate_at_launch = true
+    },
+    {
+      key                 = "usecase"
+      value               = var.usecase
+      propagate_at_launch = true
+    },
+    {
+      key                 = "tier"
+      value               = "application"
+      propagate_at_launch = true
+    },        
+  ]
+}
+
+resource "aws_autoscaling_attachment" "asg_attachment_bar" {
+  autoscaling_group_name = module.mediawikiapp_autoscaling_group.autoscaling_group_name
+  alb_target_group_arn   =  module.alb.target_group_arns[0]
+}

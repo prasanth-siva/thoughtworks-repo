@@ -21,3 +21,7 @@ output "public_route_table_id" {
 output "vpc_id" {
   value = module.vpc.vpc_id
 }
+
+output "mediawiki_target_group" {
+  value = module.alb.target_group_arns[0]
+}

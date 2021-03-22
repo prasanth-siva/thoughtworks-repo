@@ -19,6 +19,11 @@ ami_names = {
   mediawiki = "CentOS-Linux-7-HVM"
 }
 
+app_min_count        = 2
+app_max_count        = 4
+app_desired_count    = 2
+protect_scalein  = true
+
 usecase              = "mediawiki-prod"
 product              = "mediawiki"
 environment          = "prod"
